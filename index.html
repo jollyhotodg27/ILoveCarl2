@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HNU Turn-by-Turn Navigation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- Leaflet Routing Machine -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+  <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.min.js"></script>
+
+  <!-- ORS Routing Control -->
+  <script src="https://unpkg.com/@geonet/leaflet-control-openrouteservice"></script>
+
+  <style>
+    body, html {
+      height: 100%;
+      margin: 0;
+    }
+    #map {
+      height: 100%;
+      width: 100%;
+    }
+    #instructions {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      background: white;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 14px;
+      box-shadow: 0 0 10px #00000030;
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+    <select id="building-select" style="position: absolute; top: 10px; left: 10px; z-index: 1000; padding: 5px;">
+        <option disabled selected>Select a Building</option>
+        <option value="9.6489,123.8508">balay ni bantol</option>
+        <option value="9.6480,123.8512">CASintahan</option>
+        <option value="9.6473,123.8501">Tubol Building</option>
+        <option value="9.648836069141659,123.8671386907348">Junior High School Building</option>
+    </select>
+  <div id="map"></div>
+  <div id="instructions">Getting your location... idk unsay gamit ani</div>
+
+  <script>
+    const orsApiKey = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImIxNDg4NmIxZDI1MjQ0ZWU4NzIzNTUyN2ZmYzk1M2VhIiwiaCI6Im11cm11cjY0In0=" ;
+
+    document.getElementById('building-select').addEventListener('change', function () {
+      const coords = this.value.split(',');
+      destination = [parseFloat(coords[0]), parseFloat(coords[1])];
+  
+    });
+    let destination = null;
+    let destMarker = null;
+    let routingControl = null;
+
+    const map = L.map('map').setView([9.6475, 123.8497], 17); 
+
+   
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    document.getElementById('building-select').addEventListener('change', function () {
+      const coords = this.value.split(',').map(s => parseFloat(s.trim()));
+      destination = coords;
+
+      if (destMarker) map.removeLayer(destMarker);
+      destMarker = L.marker(destination).addTo(map).bindPopup("Destination").openPopup();
+
+      if (routingControl) map.removeControl(routingControl);
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(position => {
+          const userCoords = [position.coords.latitude, position.coords.longitude];
+          map.setView(userCoords, 17);
+
+          L.marker(userCoords).addTo(map).bindPopup("You are here").openPopup();
+
+          routingControl = L.Routing.control({
+            waypoints: [
+              L.latLng(userCoords),
+              L.latLng(destination)
+            ],
+            router: new L.Routing.openrouteservice(orsApiKey, {
+              profile: 'foot-walking'
+            }),
+            lineOptions: {
+              styles: [{ color: 'blue', opacity: 0.7, weight: 5 }]
+            },
+            show: false,
+            collapsible: true,
+            addWaypoints: false,
+            draggableWaypoints: false,
+            createMarker: () => null 
+          }).addTo(map);
+
+          routingControl.on('routesfound', function(e) {
+            const steps = e.routes[0].instructions;
+            const container = document.getElementById('instructions');
+            container.innerHTML = '<strong>Turn-by-Turn Directions:</strong><br>';
+            steps.forEach((step, index) => {
+              container.innerHTML += `${index + 1}. ${step.text}<br>`;
+            });
+          });
+        }, error => {
+          alert('Location access denied or not available.');
+        });
+      } else {
+        alert("Geolocation is not supported by this browser.");
+      }
+    });
+  </script>
+</body>
+</html>
